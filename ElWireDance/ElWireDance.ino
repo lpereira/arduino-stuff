@@ -1,5 +1,7 @@
 #include <avr/wdt.h>
+#include <avr/pgmspace.h>
 #include <SoftwareSerial.h>
+#include <EEPROM.h>
 
 // HC-06 Bluetooth class
 // @lafp, 18-01-2014
@@ -14,7 +16,7 @@ class Bluetooth {
     BR_38400,
     BR_57600
   };
- 
+
   Bluetooth(const int rx, const int tx)
     : conn(rx, tx) {}
 
@@ -37,19 +39,154 @@ class Bluetooth {
     conn.write("AT+");
     conn.write(command);
     conn.write(parameter);
-    while (!conn.available());
-    while (conn.available()) conn.read();
+    while (!conn.available()) delay(5);
+    delay(10);
+    while (conn.available()) Serial.print((char)conn.read());
   }
 
   SoftwareSerial conn;
 };
+
+class Bg {
+ private:
+  static Bg *task1, *task2, *task3;
+
+ public:
+  Bg(long interval) : interval_(interval), next_run_(millis()) {}
+
+  virtual bool run() = 0;
+
+  static void addTask(Bg *task) {
+    if (!Bg::task1) {
+      Bg::task1 = task;
+    } else if (!Bg::task2) {
+      Bg::task2 = task;
+    } else if (!Bg::task3) {
+      Bg::task3 = task;
+    } else {
+      delete task;
+    }
+  }
+
+  static void runTasks() {
+    Bg::task1 = runTask(Bg::task1, millis());
+    Bg::task2 = runTask(Bg::task2, millis());
+    Bg::task3 = runTask(Bg::task3, millis());
+  }
+ private:
+  static Bg *runTask(Bg *task, const long m) {
+    if (task) {
+      if (m >= task->next_run_) {
+         if (task->run()) {
+           task->next_run_ = task->interval_ + m;
+         } else {
+           delete task;
+           task = NULL;
+         }
+      }
+    }
+    return task;
+  }
+
+  long interval_;
+  long next_run_;
+};
+
+Bg *Bg::task1, *Bg::task2, *Bg::task3;
+
+// Generated with this Python program:
+// >>> def pwm(p):
+// ...   p = 0.5 + 0.64057897435 * exp(0.0599320084 * p)
+// ...   if p > 255: return 255
+// ...   if p < 0: return 0
+// ...   return int(p)
+unsigned char pwmFadeTable[] PROGMEM = {
+   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2,
+   2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 5, 5, 5,
+   6, 6, 6, 7, 7, 7, 8, 8, 9, 10, 10, 11, 11, 12, 13, 14,
+   14, 15, 16, 17, 18, 20, 21, 22, 23, 25, 26, 28, 30, 32,
+   33, 36, 38, 40, 43, 45, 48, 51, 54, 57, 61, 65, 69, 73,
+   77, 82, 87, 93, 98, 104, 111, 118, 125, 133, 141, 150,
+   159, 169, 179, 190, 202, 214, 228, 242, 255
+};
+
+class FadeBg : public Bg {
+ public:
+  FadeBg(char pin, long duration, bool in)
+      : Bg(max(duration / 100, 1))
+      , pin_(pin)
+      , percentage_(in ? 0 : 100)
+      , in_(in) {}
+
+  virtual bool run();
+ private:
+  char percentage_;
+  char pin_;
+  bool in_;
+};
+
+bool FadeBg::run() {
+  if (in_) {
+    if (percentage_ == 100)
+      return false;
+    percentage_++;
+  } else {
+    if (!percentage_)
+      return false;
+    percentage_--;
+  }
+  analogWrite(pin_, pgm_read_byte(&pwmFadeTable[percentage_]));
+  return true;
+}
+
+class StrobeBg : public Bg {
+ public:
+  StrobeBg(char pin, long interval, char count)
+      : Bg(interval)
+      , pin_(pin)
+      , count_(count * 2) {}
+
+  virtual bool run();
+ private:
+  char count_;
+  char pin_;
+};
+
+bool StrobeBg::run() {
+  digitalWrite(pin_, count_ & 1);
+  return --count_;
+}
 
 enum State {
   IDLE,
   WAITING_ANALOG_ID,
   WAITING_ANALOG_VALUE,
   WAITING_DIGITAL_ID,
-  WAITING_DIGITAL_VALUE
+  WAITING_DIGITAL_VALUE,
+  WAITING_STROBE_ID,
+  WAITING_STROBE_VALUE1,
+  WAITING_STROBE_VALUE2,
+  WAITING_FADE_IN_ID,
+  WAITING_FADE_IN_VALUE,
+  WAITING_FADE_OUT_ID,
+  WAITING_FADE_OUT_VALUE,
+  WAITING_DANCER_NUMBER
+};
+
+static const char *stateAsString[] = {
+  "IDLE",
+  "WAITING_ANALOG_ID",
+  "WAITING_ANALOG_VALUE",
+  "WAITING_DIGITAL_ID",
+  "WAITING_DIGITAL_VALUE",
+  "WAITING_STROBE_ID",
+  "WAITING_STROBE_VALUE1",
+  "WAITING_STROBE_VALUE2",
+  "WAITING_FADE_IN_ID",
+  "WAITING_FADE_IN_VALUE",
+  "WAITING_FADE_OUT_ID",
+  "WAITING_FADE_OUT_VALUE",
+  "WAITING_DANCER_NUMBER"
 };
 
 static const int bluetoothRxPin = 3;
@@ -57,11 +194,9 @@ static const int bluetoothTxPin = 4;
 static const int ledPin = 13;
 static const int elWire1Pin = 5;
 static const int elWire2Pin = 6;
-
-Bluetooth bluetooth(bluetoothRxPin, bluetoothTxPin);
-State state = IDLE;
-boolean ledPinState = false;
-int id, value;
+static Bluetooth bluetooth(bluetoothRxPin, bluetoothTxPin);
+static State state = IDLE;
+static int id, value;
 
 void setup()
 {
@@ -72,14 +207,39 @@ void setup()
   digitalWrite(ledPin, LOW);
   pinMode(elWire1Pin, OUTPUT);
   pinMode(elWire2Pin, OUTPUT);
+
+  Serial.println("EL Wire/Bluetooth controller");
+  Serial.println("Ver 3");
+
+  char name[strlen("Dancarino X") + 1];
+  char dancer_number = EEPROM.read(0) % 10;
+  memcpy(name, "Dancarino X", sizeof( "Dancarino X"));
+  name[10] = dancer_number + '0';
+  bluetooth.set_name(name);
+
+  Serial.print("Device name: ");
+  Serial.println(name);
+
+  bluetooth.set_pin("0000");
+
+  Serial.println("Bluetooth module ready");
 }
 
 void loop()
 {
-  if (!bluetooth.available())
+  if (!bluetooth.available()) {
+    Bg::runTasks();
     return;
+  }
+
+  Serial.print("Current state: ");
+  Serial.println(stateAsString[state]);
 
   int chr = bluetooth.read();
+
+  Serial.print("Got byte from BT: ");
+  Serial.println(chr);
+
   switch (state) {
     case IDLE:
       blinkStatusLed();
@@ -91,8 +251,50 @@ void loop()
         testMode();
       } else if (chr == 'R') {
         reset();
+      } else if (chr == 'L') {
+        blinkStatusLed();
+      } else if (chr == 'S') {
+        state = WAITING_STROBE_ID;
+      } else if (chr == 'O') {
+        state = WAITING_FADE_OUT_ID;
+      } else if (chr == 'I') {
+        state = WAITING_FADE_IN_ID;
+      } else if (chr == 'N') {
+        state = WAITING_DANCER_NUMBER;
       }
       return;
+    case WAITING_DANCER_NUMBER:
+      EEPROM.write(0, chr % 10);
+      reset();
+      break;
+    case WAITING_FADE_OUT_ID:
+      id = chr;
+      state = isValidId() ? WAITING_FADE_OUT_VALUE : IDLE;
+      break;
+    case WAITING_FADE_OUT_VALUE:
+      Bg::addTask(new FadeBg(idToPin(id), chr * 10, false));
+      state = IDLE;
+      break;
+    case WAITING_FADE_IN_ID:
+      id = chr;
+      state = isValidId() ? WAITING_FADE_IN_VALUE : IDLE;
+      break;
+    case WAITING_FADE_IN_VALUE:
+      Bg::addTask(new FadeBg(idToPin(id), chr * 10, true));
+      state = IDLE;
+      break;
+    case WAITING_STROBE_ID:
+      id = chr;
+      state = isValidId() ? WAITING_STROBE_VALUE1 : IDLE;
+      break;
+    case WAITING_STROBE_VALUE1:
+      value = chr;
+      state = WAITING_STROBE_VALUE2;
+      break;
+    case WAITING_STROBE_VALUE2:
+      Bg::addTask(new StrobeBg(idToPin(id), value, chr));
+      state = IDLE;
+      break;
     case WAITING_ANALOG_ID:
       id = chr;
       state = isValidId() ? WAITING_ANALOG_VALUE : IDLE;
@@ -127,8 +329,14 @@ void testModeBlinkInternal(int el1Mode, int el2Mode) {
 }
 
 void testMode() {
-  fadeInOut(elWire1Pin);
-  fadeInOut(elWire2Pin);
+  Serial.println("Entering test mode");
+#if 0
+  fadeIn(elWire1Pin, 1000);
+  fadeOut(elWire1Pin, 1000);
+
+  fadeIn(elWire2Pin, 1000);
+  fadeOut(elWire2Pin, 1000);
+#endif
 
   for (int j = 0; j < 4; j++) {
     for (int i = 0; i < 5; i++) {
@@ -140,38 +348,20 @@ void testMode() {
       testModeBlinkInternal(LOW, LOW);
     }
   }
-}
 
-void fadeInOutInternal(int pin, int value, int &increment, int &timeToDelay) {
-    analogWrite(pin, value);
-    
-    if (value % 5 == 0) {
-      increment++;
-      timeToDelay--;
-    }
-    delay(timeToDelay);
-}
-
-void fadeInOut(int pin) {
-  int increment = 1;
-  int timeToDelay = 50;
-
-  for (int i = 0; i < 255; i += increment)
-    fadeInOutInternal(pin, i, increment, timeToDelay);
-
-  increment = 1;
-  timeToDelay = 50;
-  for (int i = 255; i >= 0; i -= increment)
-    fadeInOutInternal(pin, i, increment, timeToDelay);
+  Serial.println("Ending test mode");
 }
 
 void reset() {
+  Serial.println("Resetting");
   wdt_enable(WDTO_15MS);
   while (1);
 }
 
 void blinkStatusLed() {
-  digitalWrite(ledPin, ledPinState);
-  ledPinState ^= 1;
+  for (int i = 0; i < 10; i++) {
+    digitalWrite(ledPin, i & 1);
+    delay(100);
+  }
 }
 
