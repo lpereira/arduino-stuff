@@ -3,6 +3,9 @@
 #include <SoftwareSerial.h>
 #include <EEPROM.h>
 
+// Should be a power of 2!
+#define N_TASKS 4
+
 // HC-06 Bluetooth class
 // @lafp, 18-01-2014
 class Bluetooth {
@@ -49,29 +52,47 @@ class Bluetooth {
 
 class Bg {
  private:
-  static Bg *task1, *task2, *task3;
+  static Bg *tasks_[N_TASKS];
+  static char curr_task_;
 
  public:
-  Bg(long interval) : interval_(interval), next_run_(millis()) {}
+  Bg(long interval)
+    : interval_(interval)
+    , next_run_(millis()) {}
 
   virtual bool run() = 0;
 
   static void addTask(Bg *task) {
-    if (!Bg::task1) {
-      Bg::task1 = task;
-    } else if (!Bg::task2) {
-      Bg::task2 = task;
-    } else if (!Bg::task3) {
-      Bg::task3 = task;
-    } else {
-      delete task;
+    for (char i = 0; i < N_TASKS; i++) {
+      if (!Bg::tasks_[i]) {
+        Bg::tasks_[i] = task;
+        return;
+      }
     }
+
+    delete task;
   }
 
-  static void runTasks() {
-    Bg::task1 = runTask(Bg::task1, millis());
-    Bg::task2 = runTask(Bg::task2, millis());
-    Bg::task3 = runTask(Bg::task3, millis());
+  static void schedule() {
+    Bg::tasks_[Bg::curr_task_] = runTask(Bg::tasks_[Bg::curr_task_], millis());
+    Bg::curr_task_ = (Bg::curr_task_ + 1) & N_TASKS;
+  }
+
+  static void setupInterrupts() {
+    cli();
+
+    Bg::curr_task_ = 0;
+    memset(Bg::tasks_, 0, sizeof(Bg::tasks_));
+
+    TCCR1A = 0;
+    TCCR1B = 0;
+    TCNT1 = 0;
+    OCR1A = 32;
+    TCCR1B |= 1<<WGM12;
+    TCCR1B |= (1<<CS12)|(1<<CS10);
+    TIMSK1 |= 1<<OCIE1A;
+
+    sei();
   }
  private:
   static Bg *runTask(Bg *task, const long m) {
@@ -92,7 +113,12 @@ class Bg {
   long next_run_;
 };
 
-Bg *Bg::task1, *Bg::task2, *Bg::task3;
+Bg *Bg::tasks_[N_TASKS];
+char Bg::curr_task_;
+
+ISR(TIMER1_COMPA_vect) {
+ Bg::schedule();
+}
 
 // Generated with this Python program:
 // >>> def pwm(p):
@@ -209,7 +235,9 @@ void setup()
   pinMode(elWire2Pin, OUTPUT);
 
   Serial.println("EL Wire/Bluetooth controller");
-  Serial.println("Ver 3");
+  Serial.println("Ver 4");
+
+  Bg::setupInterrupts();
 
   char name[strlen("Dancarino X") + 1];
   char dancer_number = EEPROM.read(0) % 10;
@@ -227,8 +255,7 @@ void setup()
 
 void loop()
 {
-  if (!bluetooth.available()) {
-    Bg::runTasks();
+  if (!bluetooth.available())
     return;
   }
 
