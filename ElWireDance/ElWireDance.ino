@@ -199,22 +199,6 @@ enum State {
   WAITING_DANCER_NUMBER
 };
 
-static const char *stateAsString[] = {
-  "IDLE",
-  "WAITING_ANALOG_ID",
-  "WAITING_ANALOG_VALUE",
-  "WAITING_DIGITAL_ID",
-  "WAITING_DIGITAL_VALUE",
-  "WAITING_STROBE_ID",
-  "WAITING_STROBE_VALUE1",
-  "WAITING_STROBE_VALUE2",
-  "WAITING_FADE_IN_ID",
-  "WAITING_FADE_IN_VALUE",
-  "WAITING_FADE_OUT_ID",
-  "WAITING_FADE_OUT_VALUE",
-  "WAITING_DANCER_NUMBER"
-};
-
 static const int bluetoothRxPin = 3;
 static const int bluetoothTxPin = 4;
 static const int ledPin = 13;
@@ -257,15 +241,8 @@ void loop()
 {
   if (!bluetooth.available())
     return;
-  }
-
-  Serial.print("Current state: ");
-  Serial.println(stateAsString[state]);
 
   int chr = bluetooth.read();
-
-  Serial.print("Got byte from BT: ");
-  Serial.println(chr);
 
   switch (state) {
     case IDLE:
@@ -356,7 +333,6 @@ void testModeBlinkInternal(int el1Mode, int el2Mode) {
 }
 
 void testMode() {
-  Serial.println("Entering test mode");
 #if 0
   fadeIn(elWire1Pin, 1000);
   fadeOut(elWire1Pin, 1000);
@@ -375,12 +351,9 @@ void testMode() {
       testModeBlinkInternal(LOW, LOW);
     }
   }
-
-  Serial.println("Ending test mode");
 }
 
 void reset() {
-  Serial.println("Resetting");
   wdt_enable(WDTO_15MS);
   while (1);
 }
