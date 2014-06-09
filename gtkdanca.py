@@ -18,7 +18,7 @@ class Profile(dbus.service.Object):
                             in_signature="oha{sv}", out_signature="")
     def NewConnection(self, path, fd, properties):
         print('Dancer profiler received new connection, fd %s' % fd)
-        BluetoothDevice.INSTANCES_BY_PATH[path].set_fd(fd)
+        BluetoothDevice.INSTANCES_BY_PATH[path].set_fd_and_path(fd, path)
 
 
 class Agent(dbus.service.Object):
@@ -89,14 +89,16 @@ class Agent(dbus.service.Object):
         print("Cancel")
 
 class Dancarino:
-    def __init__(self, fd):
+    def __init__(self, fd, bt_path):
         self.fd = fd
+        self.bt_path = bt_path
 
     def __del__(self):
         os.close(self.fd)
     
     def __write(self, s):
         s = bytes(s, 'iso-8859-1')
+        print('Writing %d bytes to fd %d' % (len(s), self.fd))
         os.write(self.fd, s)
 
     def test_mode(self):
@@ -122,12 +124,18 @@ class Dancarino:
 
     def fade_in(self, wire, duration):
         assert(wire in (0, 1))
-        
+
+        duration = int(duration / 10.0 * 255)        
+        if duration > 255: duration = 255
+        if duration < 1: duration = 1
         self.__write('I%c%c' % (chr(wire), chr(duration)))
     
     def fade_out(self, wire, duration):
         assert(wire in (0, 1))
 
+        duration = int(duration / 10.0 * 255)        
+        if duration > 255: duration = 255
+        if duration < 1: duration = 1
         self.__write('O%c%c' % (chr(wire), chr(duration)))
     
     def strobe(self, wire, times, delay_between_blink):
@@ -152,6 +160,19 @@ class BluetoothDevice:
     for instance in BluetoothDevice.INSTANCES_BY_PATH:
       if BluetoothDevice.DEVICES[instance].get('Address', None) == addr:
         return BluetoothDevice.INSTANCES_BY_PATH[instance]
+    return None
+
+  @staticmethod
+  def find_dancer_by_id(id):
+    id = str(id)
+    for path, device in BluetoothDevice.INSTANCES_BY_PATH.items():
+      if not device.dancarino:
+        continue
+      props = BluetoothDevice.DEVICES.get(path, None)
+      if not props:
+        continue
+      if props['Name'].split(' ')[-1] == id:
+        return device.dancarino
     return None
 
   @staticmethod
@@ -243,9 +264,9 @@ class BluetoothDevice:
     self.device.Pair(reply_handler=reply_handler,
       error_handler=error_handler, timeout=75000)
 
-  def set_fd(self, fd):
+  def set_fd_and_path(self, fd, path):
     self.fd = fd.take()
-    self.dancarino = Dancarino(self.fd)
+    self.dancarino = Dancarino(self.fd, path)
     BluetoothDevice.WINDOW.update()
   
   def connect(self):
@@ -266,7 +287,7 @@ class WaitAction(GObject.GObject):
 
   def __init__(self, time):
     GObject.GObject.__init__(self)
-    self.time = time
+    self.time = float(time)
 
   def as_string_for_list_view(self):
     return 'Espera %s' % self.time
@@ -282,10 +303,10 @@ class TurnOnAction(GObject.GObject):
 
   def __init__(self, fio):
     GObject.GObject.__init__(self)
-    self.fio = fio
+    self.fio = int(fio)
 
   def as_string_for_list_view(self):
-    return 'Liga %d' % self.fio
+    return 'Liga %s' % self.fio
   
   def serialize(self):
     return {'action': 'TurnOnAction', 'attrs': [self.fio]}
@@ -298,10 +319,10 @@ class TurnOffAction(GObject.GObject):
 
   def __init__(self, fio):
     GObject.GObject.__init__(self)
-    self.fio = fio
+    self.fio = int(fio)
 
   def as_string_for_list_view(self):
-    return 'Desliga %d' % self.fio
+    return 'Desliga %s' % self.fio
 
   def serialize(self):
     return {'action': 'TurnOffAction', 'attrs': [self.fio]}
@@ -314,34 +335,34 @@ class FadeInAction(GObject.GObject):
 
   def __init__(self, fio, duration):
     GObject.GObject.__init__(self)
-    self.fio = fio
-    self.duration = duration
+    self.fio = int(fio)
+    self.duration = float(duration)
 
   def as_string_for_list_view(self):
-    return 'Fade in (%ss)' % self.duration
+    return 'Fade in %s (%ss)' % (self.fio, self.duration)
 
   def serialize(self):
     return {'action': 'FadeInAction', 'attrs': [self.fio, self.duration]}
 
   def perform(self, dancarino):
-    dancarino.fade_in(self.fio, self.duracao)
+    dancarino.fade_in(self.fio, self.duration)
 
 class FadeOutAction(GObject.GObject):
   attrs = (('fio', 'Fio (0 ou 1)'), ('duration', 'Duração (s)'))
 
   def __init__(self, fio, duration):
     GObject.GObject.__init__(self)
-    self.fio = fio
-    self.duration = duration
+    self.fio = int(fio)
+    self.duration = float(duration)
   
   def as_string_for_list_view(self):
-    return 'Fade out (%ss)' % self.duration
+    return 'Fade out %s (%ss)' % (self.fio, self.duration)
 
   def serialize(self):
     return {'action': 'FadeOutAction', 'attrs': [self.fio, self.duration]}
 
   def perform(self, dancarino):
-    dancarino.fade_out(self.fio, self.duracao)
+    dancarino.fade_out(self.fio, self.duration)
 
 
 class Actions(GObject.GObject):
@@ -373,7 +394,7 @@ class Actions(GObject.GObject):
       actions.append(action)
 
     return Actions(actions)
-
+  
 
 class ActionConstructDialog(Gtk.Dialog):
   def __init__(self, parent, attrs):
@@ -479,6 +500,37 @@ class ActionsEditor(Gtk.Dialog):
                   self.store.get_value(iter, 0).as_string_for_list_view())
 
 
+class Maestro:
+  def __init__(self, actions, dancer):
+    self.actions = actions
+    self.current_action = 0 if self.actions else -1
+    self.dancer = BluetoothDevice.find_dancer_by_id(dancer)
+    
+    print('Creating Maestro for dancer %s' % dancer)
+  
+  def next(self):
+    if self.current_action < 0:
+      return
+
+    try:
+      action = self.actions[self.current_action]
+    except IndexError:
+      return
+
+    self.current_action += 1
+
+    if isinstance(action, WaitAction):
+      print("[dancer %s] Waiting: %ss" % (self.dancer, action.time))
+      GLib.timeout_add(int(float(action.time) * 1000), self.next)
+    else:
+      if self.dancer:
+        action.perform(self.dancer)
+      else:
+        print('[dancer %s] Nao consegui achar dancarino com esse ID, ignorando' % self.dancer)
+      print('[dancer %s] Performing: %s' % (self.dancer, action.as_string_for_list_view()))
+      GLib.idle_add(self.next)
+
+
 class RenameBluetoothDevice(Gtk.Dialog):
   def __init__(self, parent, current_name):
     Gtk.Dialog.__init__(self, 'Mudar ID do dançarino', parent, 0,
@@ -511,6 +563,8 @@ class RenameBluetoothDevice(Gtk.Dialog):
 class BluetoothWindow(Gtk.Window):
   def __init__(self):
     Gtk.Window.__init__(self, title='Dispositivos Bluetooth')
+    self.props.default_width=500
+    self.props.default_height=500
     
     hb = Gtk.HeaderBar()
     hb.props.show_close_button = False
@@ -588,6 +642,7 @@ class BluetoothWindow(Gtk.Window):
         device_props.get('Name', 'N/D')
       ])
 
+
 class MainWindow(Gtk.Window):
   def __init__(self):
     Gtk.Window.__init__(self, title='Controle de Iluminação Bluetooth')
@@ -599,6 +654,13 @@ class MainWindow(Gtk.Window):
     hb.props.title = self.props.title
     self.set_titlebar(hb)
     
+    button = Gtk.Button()
+    icon = Gio.ThemedIcon(name='media-play')
+    image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
+    button.connect('clicked', self.orchestrate)
+    button.add(image)
+    hb.pack_end(button)
+
     button = Gtk.Button()
     icon = Gio.ThemedIcon(name='add')
     image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
@@ -620,7 +682,7 @@ class MainWindow(Gtk.Window):
     button.add(image)
     hb.pack_start(button)
 
-    self.store = Gtk.ListStore(int,
+    self.store = Gtk.ListStore(int, str,
       Actions.__gtype__, Actions.__gtype__, Actions.__gtype__,
       Actions.__gtype__, Actions.__gtype__)
     self.list = Gtk.TreeView(self.store)
@@ -628,7 +690,9 @@ class MainWindow(Gtk.Window):
     
     renderer = Gtk.CellRendererText()
     column = Gtk.TreeViewColumn('Tempo', renderer, text=0)
-    
+    self.list.append_column(column)
+    renderer = Gtk.CellRendererText()
+    column = Gtk.TreeViewColumn('Intervalo', renderer, text=1)
     self.list.append_column(column)
 
     for dancer in range(5):
@@ -652,15 +716,37 @@ class MainWindow(Gtk.Window):
     
     self.bluetooth_window = None
 
+  def orchestrate(self, *args):
+    start_time = 0
+
+    for row in self.store:
+      for dancer in range(5):
+        actions = row[dancer + 2].actions
+        if actions:
+          def make_maestro(a, d):
+            maestro = Maestro(a, d + 1)
+            return lambda: maestro.next()
+        
+          GLib.timeout_add_seconds(start_time,
+                        make_maestro(actions, dancer))
+
+      start_time += 8
+      
+
   def get_actions(self, column, cell, model, iter, data):
-    column = column.dancer + 1
+    column = column.dancer + 2
     cell.set_property('text',
                   self.store.get_value(iter, column).as_string_for_list_view())
   
   def add_tempo(self, *args):
     tempos = len(self.store)
+    
+    first_tempo = tempos * 8
+    second_tempo = first_tempo + 8
+    
     self.store.append([
       tempos + 1,
+      '%ds - %ds' % (first_tempo, second_tempo),
       Actions(),
       Actions(),
       Actions(),
@@ -672,11 +758,11 @@ class MainWindow(Gtk.Window):
     dancer_data = self.store[path]
     tempo = dancer_data[0]
     try:
-      actions = dancer_data[column.dancer + 1]
+      actions = dancer_data[column.dancer + 2]
     except:
       return
 
-    dialog = ActionsEditor(self, tempo, column.dancer + 1, actions)
+    dialog = ActionsEditor(self, tempo, column.dancer + 2, actions)
     response = dialog.run()
     if response == Gtk.ResponseType.OK:
       actions.actions = [action[0] for action in dialog.store]
@@ -697,8 +783,13 @@ class MainWindow(Gtk.Window):
       
       self.store.clear()
       for tempo in pickle.loads(pickled):
+        tempos = len(self.store)
+        first_tempo = tempos * 8
+        second_tempo = first_tempo + 8
+
         self.store.append([
-          len(self.store) + 1,
+          tempos + 1,
+          '%ds - %ds' % (first_tempo, second_tempo),
           Actions.deserialize(tempo[0]),
           Actions.deserialize(tempo[1]),
           Actions.deserialize(tempo[2]),
@@ -718,7 +809,7 @@ class MainWindow(Gtk.Window):
     if response == Gtk.ResponseType.OK:
       tempos = []
       for row in self.store:
-        tempos.append([r.serialize() for r in row[1:]])
+        tempos.append([r.serialize() for r in row[2:]])
       
       f = open(dialog.get_filename(), 'wb')
       f.write(pickle.dumps(tempos))
