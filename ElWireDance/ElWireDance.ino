@@ -78,21 +78,9 @@ class Bg {
     Bg::curr_task_ = (Bg::curr_task_ + 1) & N_TASKS;
   }
 
-  static void setupInterrupts() {
-    cli();
-
+  static void begin() {
     Bg::curr_task_ = 0;
     memset(Bg::tasks_, 0, sizeof(Bg::tasks_));
-
-    TCCR1A = 0;
-    TCCR1B = 0;
-    TCNT1 = 0;
-    OCR1A = 32;
-    TCCR1B |= 1<<WGM12;
-    TCCR1B |= (1<<CS12)|(1<<CS10);
-    TIMSK1 |= 1<<OCIE1A;
-
-    sei();
   }
  private:
   static Bg *runTask(Bg *task, const long m) {
@@ -115,10 +103,6 @@ class Bg {
 
 Bg *Bg::tasks_[N_TASKS];
 char Bg::curr_task_;
-
-ISR(TIMER1_COMPA_vect) {
- Bg::schedule();
-}
 
 // Generated with this Python program:
 // >>> def pwm(p):
@@ -221,7 +205,7 @@ void setup()
   Serial.println("EL Wire/Bluetooth controller");
   Serial.println("Ver 4");
 
-  Bg::setupInterrupts();
+  Bg::begin();
 
   char name[strlen("Dancarino X") + 1];
   char dancer_number = EEPROM.read(0) % 10;
@@ -239,8 +223,10 @@ void setup()
 
 void loop()
 {
-  if (!bluetooth.available())
+  if (!bluetooth.available()) {
+    Bg::schedule();
     return;
+  }
 
   int chr = bluetooth.read();
 
