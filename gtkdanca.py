@@ -197,11 +197,11 @@ class BluetoothDevice:
 
     BluetoothDevice.ADAPTER = bluezutils.find_adapter(None)
 
-    '''om = dbus.Interface(bus.get_object('org.bluez', '/'),
+    om = dbus.Interface(bus.get_object('org.bluez', '/'),
       'org.freedesktop.DBus.ObjectManager')
     for path, interfaces in om.GetManagedObjects().items():
       if 'org.bluez.Device1' in interfaces:
-        BluetoothDevice.unpair(interfaces['org.bluez.Device1']['Address'])'''
+        BluetoothDevice.unpair(interfaces['org.bluez.Device1']['Address'])
     
     props = dbus.Interface(bus.get_object("org.bluez",
       BluetoothDevice.ADAPTER.object_path), "org.freedesktop.DBus.Properties")
@@ -211,7 +211,7 @@ class BluetoothDevice:
 
   @staticmethod
   def interfaces_added(path, interfaces):
-    props = interfaces['org.bluez.Device1']
+    props = interfaces.get('org.bluez.Device1', None)
     if not props:
       return
     print(path + ': added iface')
@@ -229,11 +229,10 @@ class BluetoothDevice:
     if interface != 'org.bluez.Device1':
       return
 
-    print('Changed: %s' % changed)
     if path in BluetoothDevice.DEVICES:
       BluetoothDevice.DEVICES[path].update(changed)
       
-      if not BluetoothDevice.DEVICES[path].get('Connected', True):
+      if not changed.get('Connected', True):
         print('Lost connection to device %s, reconnecting' % path)
         BluetoothDevice.INSTANCES_BY_PATH[path].connect()
     else:
@@ -244,9 +243,12 @@ class BluetoothDevice:
       else:
         mo = dbus.Interface(bus.get_object('org.bluez', '/'),
           'org.freedesktop.DBus.ObjectManager').GetManagedObjects()
-        props = mo[path]['org.bluez.Device1']
-        addr = props['Address']
-        BluetoothDevice.DEVICES[path].update(props)
+        obj = mo.get(path, None)
+        if obj:
+          props = obj.get('org.bluez.Device1', None)
+          if props:
+            addr = props['Address']
+            BluetoothDevice.DEVICES[path].update(props)
 
       if addr is not None:
         BluetoothDevice.INSTANCES_BY_PATH[path] = BluetoothDevice(addr)
@@ -258,7 +260,8 @@ class BluetoothDevice:
     self.dancarino = None
     self.address = address
     self.device = bluezutils.find_device(address)
-    self.__pair()
+    if address.startswith('20:13:09'):
+      self.__pair()
 
   def __pair(self):
     def error_handler(error):
@@ -295,18 +298,30 @@ class BluetoothDevice:
     BluetoothDevice.WINDOW.update()
   
   def connect(self):
-    if self.connecting:
+    if self.connecting or not self.address.startswith('20:13:09'):
       return
 
     dev_path = self.device.object_path
 
     print("Connecting to device %s, path %s" % (self.address, dev_path))
 
+    def reply_handler(*args):
+      print('Inside connect reply handler: %s' % str(args))
+    
+    def error_handler(*args):
+      print('Inside connect error handler: %s' % str(args))
+      if 'refused' in args[0].get_dbus_name():
+        BluetoothDevice.unpair(self.address)
+        GLib.timeout_add_seconds(1, self.__pair)
+      else:
+        GLib.timeout_add_seconds(1, self.connect)
+
     try:
       dev = dbus.Interface(bus.get_object('org.bluez', dev_path),
         'org.bluez.Device1')
       self.connecting = True
-      dev.ConnectProfile(RFCOMM_UUID)
+      dev.ConnectProfile(RFCOMM_UUID, reply_handler=reply_handler,
+        error_handler=error_handler, timeout=75000)
     except dbus.exceptions.DBusException as e:
       self.fd = -1
       BluetoothDevice.WINDOW.update()
