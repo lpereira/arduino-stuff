@@ -81,7 +81,7 @@ class Bg {
 
   static void schedule() {
     Bg::tasks_[Bg::curr_task_] = runTask(Bg::tasks_[Bg::curr_task_], millis());
-    Bg::curr_task_ = (Bg::curr_task_ + 1) & N_TASKS;
+    Bg::curr_task_ = (Bg::curr_task_ + 1) & (N_TASKS - 1);
   }
 
   static void begin() {
