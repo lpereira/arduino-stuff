@@ -116,13 +116,13 @@ class Dancarino:
         self.__write('R')
     
     def analog_write(self, wire, value):
-        assert(wire in (0, 1))
+        assert(wire in (0, 1, 2))
         assert(0 <= value <= 255)
         
         self.__write('A%c%c' % (chr(wire), chr(value)))
     
     def digital_write(self, wire, value):
-        assert(wire in (0, 1))
+        assert(wire in (0, 1, 2))
         value = 1 if value else 0
 
         self.__write('D%c%c' % (chr(wire), chr(value)))
@@ -158,10 +158,10 @@ class Dancarino:
         duration = self.__calculate_fade_duration(duration)
         print("Para um fade de %f segundos, param=%d" % (prev_duration, duration))
         self.__write('O%c%c' % (chr(wire), chr(duration)))
-    
+
     def strobe(self, wire, times, delay_between_blink):
-        assert(wire in (0, 1))
-        
+        assert(wire in (0, 1, 2))
+
         self.__write('S%c%c%c' % (chr(wire), chr(times), chr(delay_between_blink)))
 
     def set_number(self, number):
@@ -364,15 +364,17 @@ class WaitAction(GObject.GObject):
     pass
 
 class TurnOnAction(GObject.GObject):
-  attrs = (('fio', 'Fio (0 ou 1)'),)
+  attrs = (('fio', 'Fio (0 ou 1; 2 liga ambos)'),)
 
   def __init__(self, fio):
     GObject.GObject.__init__(self)
     self.fio = int(fio)
 
   def as_string_for_list_view(self):
+    if self.fio == 2:
+      return 'Liga ambos'
     return 'Liga %s' % self.fio
-  
+
   def serialize(self):
     return {'action': 'TurnOnAction', 'attrs': [self.fio]}
 
@@ -380,13 +382,15 @@ class TurnOnAction(GObject.GObject):
     dancarino.digital_write(self.fio, 1)
 
 class TurnOffAction(GObject.GObject):
-  attrs = (('fio', 'Fio (0 ou 1)'),)
+  attrs = (('fio', 'Fio (0 ou 1; 2 desliga ambos)'),)
 
   def __init__(self, fio):
     GObject.GObject.__init__(self)
     self.fio = int(fio)
 
   def as_string_for_list_view(self):
+    if self.fio == 2:
+      return 'Desliga ambos'
     return 'Desliga %s' % self.fio
 
   def serialize(self):
@@ -396,7 +400,7 @@ class TurnOffAction(GObject.GObject):
     dancarino.digital_write(self.fio, 0)
 
 class FadeInAction(GObject.GObject):
-  attrs = (('fio', 'Fio (0 ou 1)'), ('duration', 'Duração (s)'))
+  attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'), ('duration', 'Duração (s)'))
 
   def __init__(self, fio, duration):
     GObject.GObject.__init__(self)
@@ -404,6 +408,8 @@ class FadeInAction(GObject.GObject):
     self.duration = float(duration)
 
   def as_string_for_list_view(self):
+    if self.fio == 2:
+      return 'Fade in ambos (%ss)' % (self.duration)
     return 'Fade in %s (%ss)' % (self.fio, self.duration)
 
   def serialize(self):
@@ -413,18 +419,20 @@ class FadeInAction(GObject.GObject):
     dancarino.fade_in(self.fio, self.duration)
 
 class FadeOutAction(GObject.GObject):
-  attrs = (('fio', 'Fio (0 ou 1)'), ('duration', 'Duração (s)'))
+  attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'), ('duration', 'Duração (s)'))
 
   def __init__(self, fio, duration):
     GObject.GObject.__init__(self)
     self.fio = int(fio)
     self.duration = float(duration)
-  
+
   def as_string_for_list_view(self):
+    if self.fio == 2:
+      return 'Fade out ambos (%ss)' % (self.duration)
     return 'Fade out %s (%ss)' % (self.fio, self.duration)
 
   def serialize(self):
-    return {'action': 'FadeOutAction', 'attrs': [self.fio, self.duration]}
+    return {'action': 'FadeOutAction; 2 ambos', 'attrs': [self.fio, self.duration]}
 
   def perform(self, dancarino):
     dancarino.fade_out(self.fio, self.duration)
