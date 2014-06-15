@@ -758,14 +758,14 @@ class MainWindow(Gtk.Window):
     Gtk.Window.__init__(self, title='Controle de Iluminação Bluetooth')
     self.props.default_width=600
     self.props.default_height=700
-    
+
     hb = Gtk.HeaderBar()
     hb.props.show_close_button = True
     hb.props.title = self.props.title
     self.set_titlebar(hb)
-    
+
     button = Gtk.Button()
-    icon = Gio.ThemedIcon(name='media-play')
+    icon = Gio.ThemedIcon(name='player_play')
     image = Gtk.Image.new_from_gicon(icon, Gtk.IconSize.BUTTON)
     button.connect('clicked', self.orchestrate)
     button.add(image)
