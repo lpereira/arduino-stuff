@@ -285,7 +285,7 @@ void loop()
       state = isValidId() ? WAITING_FADE_OUT_VALUE : IDLE;
       break;
     case WAITING_FADE_OUT_VALUE:
-      Bg::addTask(new FadeBg(idToPin(id), chr * 10, false));
+      Bg::addTask(new FadeBg(idToPin(id), chr, false));
       state = IDLE;
       break;
     case WAITING_FADE_IN_ID:
@@ -293,7 +293,7 @@ void loop()
       state = isValidId() ? WAITING_FADE_IN_VALUE : IDLE;
       break;
     case WAITING_FADE_IN_VALUE:
-      Bg::addTask(new FadeBg(idToPin(id), chr * 10, true));
+      Bg::addTask(new FadeBg(idToPin(id), chr, true));
       state = IDLE;
       break;
     case WAITING_STROBE_ID:
