@@ -143,6 +143,7 @@ class FadeBg : public Bg {
 };
 
 bool FadeBg::run() {
+  char old_percentage = percentage_;
   if (in_) {
     if (percentage_ == 100)
       return false;
@@ -152,7 +153,13 @@ bool FadeBg::run() {
       return false;
     percentage_--;
   }
-  analogWrite(pin_, pgm_read_byte(&pwmFadeTable[percentage_]));
+  unsigned char val = pgm_read_byte(&pwmFadeTable[old_percentage]);
+  if (pin_ < 0) {
+    analogWrite(elWire1Pin, val);
+    analogWrite(elWire2Pin, val);
+  } else {
+    analogWrite(pin_, val);
+  }
   return true;
 }
 
@@ -170,7 +177,12 @@ class StrobeBg : public Bg {
 };
 
 bool StrobeBg::run() {
-  digitalWrite(pin_, count_ & 1);
+  if (pin_ < 0) {
+    digitalWrite(elWire1Pin, count_ & 1);
+    digitalWrite(elWire2Pin, count_ & 1);
+  } else {
+    digitalWrite(pin_, count_ & 1);
+  }
   return --count_;
 }
 
@@ -292,7 +304,12 @@ void loop()
       state = isValidId() ? WAITING_ANALOG_VALUE : IDLE;
       return;
     case WAITING_ANALOG_VALUE:
-      analogWrite(idToPin(id), constrain(chr, 0, 255));
+      if (id == 2) {
+        analogWrite(idToPin(0), constrain(chr, 0, 255));
+        analogWrite(idToPin(1), constrain(chr, 0, 255));
+      } else {
+        analogWrite(idToPin(id), constrain(chr, 0, 255));
+      }
       state = IDLE;
       break;
     case WAITING_DIGITAL_ID:
@@ -300,18 +317,27 @@ void loop()
       state = isValidId() ? WAITING_DIGITAL_VALUE : IDLE;
       return;
     case WAITING_DIGITAL_VALUE:
-      digitalWrite(idToPin(id), !!chr);
+      if (id == 2) {
+        digitalWrite(idToPin(0), !!chr);
+        digitalWrite(idToPin(1), !!chr);
+      } else {
+        digitalWrite(idToPin(id), !!chr);
+      }
       state = IDLE;
       break;
   }
 }
 
 boolean isValidId() {
-  return id == 0 || id == 1;
+  return id == 0 || id == 1 || id == 2;
 }
 
 int idToPin(int id) {
-  return (id == 0) ? elWire1Pin : elWire2Pin;
+  if (id == 0)
+    return elWire1Pin;
+  if (id == 1)
+    return elWire2Pin;
+  return -1;
 }
 
 void testModeBlinkInternal(int el1Mode, int el2Mode) {
