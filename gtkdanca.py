@@ -169,6 +169,10 @@ class Dancarino:
 
         self.__write('N%c' % chr(number))
 
+    def strobe(self, wire, intervalo, piscadas):
+        assert(wire in (0, 1, 2))
+        self.__write('S%c%c%c' % (chr(wire), chr(intervalo), chr(piscadas)))
+
 
 class BluetoothDevice:
   DEVICES = {}
@@ -399,6 +403,43 @@ class TurnOffAction(GObject.GObject):
   def perform(self, dancarino):
     dancarino.digital_write(self.fio, 0)
 
+class StrobeAction(GObject.GObject):
+  attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'),
+    ('intervalo', 'Intervalo entre piscada (ms)'),
+    ('piscadas', 'Piscadas'))
+
+  def __init__(self, fio, intervalo, piscadas):
+    GObject.GObject.__init__(self)
+    self.fio = int(fio)
+    self.intervalo = float(intervalo)
+    self.piscadas = int(piscadas)
+
+  def as_string_for_list_view(self):
+    if self.fio == 2:
+      return 'Strobe ambos (%sx, %ss entre piscada)' % (
+        self.piscadas,
+        self.intervalo
+      )
+
+    return 'Strobe fio %d (%sx, %ss entre piscada)' % (
+      self.fio,
+      self.piscadas,
+      self.intervalo
+    )
+
+  def serialize(self):
+    return {
+      'action': 'StrobeAction',
+      'attrs': [
+        self.fio,
+        self.intervalo,
+        self.piscadas
+      ]
+    }
+
+  def perform(self, dancarino):
+    dancarino.strobe(self.fio, self.intervalo, self.piscadas)
+
 class FadeInAction(GObject.GObject):
   attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'), ('duration', 'Duração (s)'))
 
@@ -536,6 +577,7 @@ class ActionsEditor(Gtk.Dialog):
     add_action_button('Liga', TurnOnAction)
     add_action_button('Fade in', FadeInAction)
     add_action_button('Fade out', FadeOutAction)
+    add_action_button('Strobe', StrobeAction)
 
     self.store = Gtk.ListStore(GObject.GObject)
     self.list = Gtk.TreeView(self.store)
@@ -956,6 +998,7 @@ if __name__ == '__main__':
   GObject.type_register(TurnOffAction)
   GObject.type_register(FadeInAction)
   GObject.type_register(FadeOutAction)
+  GObject.type_register(StrobeAction)
 
   window = MainWindow()
   window.show_all()
