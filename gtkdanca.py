@@ -1,4 +1,5 @@
-#!/usr/bin/python
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
 
 from gi.repository import Gtk, Gio, GObject, GLib
 import bluezutils
