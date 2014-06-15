@@ -98,9 +98,16 @@ class Dancarino:
         os.close(self.fd)
     
     def __write(self, s):
-        s = bytes(s, 'iso-8859-1')
-        print('Writing %d bytes to fd %d' % (len(s), self.fd))
-        os.write(self.fd, s)
+        try:
+          s = bytes(s, 'iso-8859-1')
+          print('Writing %d bytes to to fd %d: %s' % (
+            len(s),
+            self.fd,
+            ','.join(str(c) for c in s)
+          ))
+          os.write(self.fd, s)
+        except:
+          print('Error writing to fd %d, ignoring' % self.fd)
 
     def test_mode(self):
         self.__write('T')
