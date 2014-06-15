@@ -467,13 +467,19 @@ class Actions(GObject.GObject):
       actions.append(action)
 
     return Actions(actions)
-  
+
 
 class ActionConstructDialog(Gtk.Dialog):
-  def __init__(self, parent, attrs):
-    Gtk.Dialog.__init__(self, 'Parâmetros', parent, 0,
-      (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-      Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+  def __init__(self, parent, attrs, values={}):
+    if not values:
+      Gtk.Dialog.__init__(self, 'Parâmetros', parent, 0,
+        (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+        Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+    else:
+      Gtk.Dialog.__init__(self, 'Editar Parâmetros', parent, 0,
+        (Gtk.STOCK_DELETE, Gtk.ResponseType.REJECT,
+        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+        Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
 
     box = Gtk.ListBox()
     box.set_selection_mode(Gtk.SelectionMode.NONE)
@@ -492,7 +498,7 @@ class ActionConstructDialog(Gtk.Dialog):
       entry = Gtk.Entry()
       entry.action_param_name = name
       entry.connect('changed', self.changed_entry)
-      entry.set_text('0')
+      entry.set_text(values.get(name, '0'))
       if first:
         entry.grab_focus()
         first = False
@@ -533,12 +539,13 @@ class ActionsEditor(Gtk.Dialog):
 
     self.store = Gtk.ListStore(GObject.GObject)
     self.list = Gtk.TreeView(self.store)
-    
+    self.list.set_reorderable(True)
+
     renderer = Gtk.CellRendererText()
     column = Gtk.TreeViewColumn('Ação', renderer)
     self.list.append_column(column)
     column.set_cell_data_func(renderer, self.get_action)
-    
+
     scrolled = Gtk.ScrolledWindow()
     scrolled.set_hexpand(True)
     scrolled.set_vexpand(True)
@@ -546,10 +553,33 @@ class ActionsEditor(Gtk.Dialog):
     self.get_content_area().add(scrolled)
     scrolled.add(self.list)
 
+    self.list.connect('row-activated', self.edit_action)
+
     for action in actions.actions:
       self.store.append([action])
 
     self.show_all()
+
+  def edit_action(self, list, path, column):
+    action = self.store[path][0]
+    if not action.attrs:
+      return
+
+    values = {}
+    serialized = action.serialize()
+    for attr, value in zip(action.attrs, serialized['attrs']):
+      values[attr[0]] = str(value)
+
+    dialog = ActionConstructDialog(self, action.attrs, values)
+    response = dialog.run()
+    if response == Gtk.ResponseType.OK:
+      values = [dialog.values[name] for name, _ in action.attrs]
+      action = action.__class__(*values)
+      self.store[path] = [action]
+    elif response == Gtk.ResponseType.REJECT:
+      self.store.remove(self.store.get_iter(path))
+
+    dialog.destroy()
 
   def add_action(self, action_type, *args):
     attrs = action_type.attrs
