@@ -211,8 +211,18 @@ void setup()
   Serial.begin(9600);
   bluetooth.begin();
 
+  char dancer_number = EEPROM.read(0) % 10;
+
   pinMode(ledPin, OUTPUT);
   digitalWrite(ledPin, LOW);
+  
+  if (dancer_number == 2) {
+    Serial.println("Workaround for dancer 2 fucked up ports");
+    pinMode(5, INPUT);
+    pinMode(6, INPUT);
+    elWire1Pin = 9;
+    elWire2Pin = 10;
+  }
   pinMode(elWire1Pin, OUTPUT);
   pinMode(elWire2Pin, OUTPUT);
 
@@ -222,7 +232,6 @@ void setup()
   Bg::begin();
 
   char name[strlen("Dancarino X") + 1];
-  char dancer_number = EEPROM.read(0) % 10;
   memcpy(name, "Dancarino X", sizeof( "Dancarino X"));
   name[10] = dancer_number + '0';
   bluetooth.set_name(name);
