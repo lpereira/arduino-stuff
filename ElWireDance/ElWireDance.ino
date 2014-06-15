@@ -86,7 +86,8 @@ class Bg {
 
   static void begin() {
     Bg::curr_task_ = 0;
-    memset(Bg::tasks_, 0, sizeof(Bg::tasks_));
+    for (int task = 0; task < N_TASKS; task++)
+      Bg::tasks_[task] = NULL;
   }
  private:
   static Bg *runTask(Bg *task, const long m) {
