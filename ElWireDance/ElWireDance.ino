@@ -6,6 +6,12 @@
 // Should be a power of 2!
 #define N_TASKS 4
 
+static const int bluetoothRxPin = 3;
+static const int bluetoothTxPin = 4;
+static const int ledPin = 13;
+static int elWire1Pin = 5;
+static int elWire2Pin = 6;
+
 // HC-06 Bluetooth class
 // @lafp, 18-01-2014
 class Bluetooth {
@@ -183,11 +189,6 @@ enum State {
   WAITING_DANCER_NUMBER
 };
 
-static const int bluetoothRxPin = 3;
-static const int bluetoothTxPin = 4;
-static const int ledPin = 13;
-static const int elWire1Pin = 5;
-static const int elWire2Pin = 6;
 static Bluetooth bluetooth(bluetoothRxPin, bluetoothTxPin);
 static State state = IDLE;
 static int id, value;
