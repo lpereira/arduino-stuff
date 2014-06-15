@@ -96,7 +96,7 @@ class Dancarino:
 
     def __del__(self):
         os.close(self.fd)
-    
+
     def __write(self, s):
         try:
           s = bytes(s, 'iso-8859-1')
@@ -111,16 +111,16 @@ class Dancarino:
 
     def test_mode(self):
         self.__write('T')
-    
+
     def reset(self):
         self.__write('R')
-    
+
     def analog_write(self, wire, value):
         assert(wire in (0, 1, 2))
         assert(0 <= value <= 255)
-        
+
         self.__write('A%c%c' % (chr(wire), chr(value)))
-    
+
     def digital_write(self, wire, value):
         assert(wire in (0, 1, 2))
         value = 1 if value else 0
@@ -205,11 +205,11 @@ class BluetoothDevice:
   @staticmethod
   def start_discovery(window):
     BluetoothDevice.WINDOW = window
-  
+
     bus.add_signal_receiver(BluetoothDevice.interfaces_added,
       dbus_interface = 'org.freedesktop.DBus.ObjectManager',
       signal_name = 'InterfacesAdded')
-  
+
     bus.add_signal_receiver(BluetoothDevice.properties_changed,
       dbus_interface = 'org.freedesktop.DBus.Properties',
       signal_name = 'PropertiesChanged',
@@ -223,11 +223,11 @@ class BluetoothDevice:
     for path, interfaces in om.GetManagedObjects().items():
       if 'org.bluez.Device1' in interfaces:
         BluetoothDevice.unpair(interfaces['org.bluez.Device1']['Address'])
-    
+
     props = dbus.Interface(bus.get_object("org.bluez",
       BluetoothDevice.ADAPTER.object_path), "org.freedesktop.DBus.Properties")
     props.Set("org.bluez.Adapter1", "Powered", True)
-    
+
     BluetoothDevice.ADAPTER.StartDiscovery()
 
   @staticmethod
@@ -244,7 +244,7 @@ class BluetoothDevice:
       print('Creating bt device for path %s' % path)
       BluetoothDevice.INSTANCES_BY_PATH[path] = BluetoothDevice(props['Address'])
     BluetoothDevice.WINDOW.update()
-      
+
   @staticmethod
   def properties_changed(interface, changed, invalidated, path):
     if interface != 'org.bluez.Device1':
@@ -252,7 +252,7 @@ class BluetoothDevice:
 
     if path in BluetoothDevice.DEVICES:
       BluetoothDevice.DEVICES[path].update(changed)
-      
+
       if not changed.get('Connected', True):
         print('Lost connection to device %s, reconnecting' % path)
         BluetoothDevice.INSTANCES_BY_PATH[path].connect()
@@ -317,7 +317,7 @@ class BluetoothDevice:
     self.dancarino = Dancarino(self.fd, path)
     self.connecting = False
     BluetoothDevice.WINDOW.update()
-  
+
   def connect(self):
     if self.connecting or not self.address.startswith('20:13:09'):
       return
@@ -328,7 +328,7 @@ class BluetoothDevice:
 
     def reply_handler(*args):
       print('Inside connect reply handler: %s' % str(args))
-    
+
     def error_handler(*args):
       print('Inside connect error handler: %s' % str(args))
       if 'refused' in args[0].get_dbus_name():
@@ -446,7 +446,7 @@ class Actions(GObject.GObject):
   def as_string_for_list_view(self):
     if not self.actions:
       return '« Vazio »'
-    
+
     return '\n'.join(
       ' • %s' % action.as_string_for_list_view() for action in self.actions)
 
@@ -507,7 +507,7 @@ class ActionConstructDialog(Gtk.Dialog):
       hbox.pack_start(entry, False, True, 0)
 
       box.add(row)
-    
+
     self.show_all()
 
   def changed_entry(self, entry):
@@ -592,12 +592,12 @@ class ActionsEditor(Gtk.Dialog):
       if response == Gtk.ResponseType.OK:
         values = [dialog.values[name] for name, _ in attrs]
         action = action_type(*values)
-      
+
       dialog.destroy()
 
     if not action is None:
       self.store.append([action])
-  
+
   def get_action(self, column, cell, model, iter, data):
     cell.set_property('text',
                   self.store.get_value(iter, 0).as_string_for_list_view())
@@ -608,9 +608,9 @@ class Maestro:
     self.actions = actions
     self.current_action = 0 if self.actions else -1
     self.dancer = BluetoothDevice.find_dancer_by_id(dancer)
-    
+
     print('Creating Maestro for dancer %s' % dancer)
-  
+
   def next(self):
     if self.current_action < 0:
       return
@@ -660,7 +660,7 @@ class RenameBluetoothDevice(Gtk.Dialog):
     hbox.pack_start(entry, False, True, 0)
 
     box.add(row)
-    
+
     self.show_all()
 
 
@@ -669,12 +669,12 @@ class BluetoothWindow(Gtk.Window):
     Gtk.Window.__init__(self, title='Dispositivos Bluetooth')
     self.props.default_width=500
     self.props.default_height=500
-    
+
     hb = Gtk.HeaderBar()
     hb.props.show_close_button = False
     hb.props.title = self.props.title
     self.set_titlebar(hb)
-    
+
     self.store = Gtk.ListStore(str, str, str, str)
     self.list = Gtk.TreeView(self.store)
 
@@ -726,7 +726,7 @@ class BluetoothWindow(Gtk.Window):
       if instance and instance.fd < 0:
         instance.connect()
         self.update()
-    
+
 
     dialog.destroy()
 
@@ -797,7 +797,7 @@ class MainWindow(Gtk.Window):
       Actions.__gtype__, Actions.__gtype__)
     self.list = Gtk.TreeView(self.store)
     self.list.props.rules_hint = True
-    
+
     renderer = Gtk.CellRendererText()
     column = Gtk.TreeViewColumn('Tempo', renderer, text=0)
     self.list.append_column(column)
@@ -813,7 +813,7 @@ class MainWindow(Gtk.Window):
 
       self.list.append_column(column)
       column.set_cell_data_func(renderer, self.get_actions)
-                         
+
     scrolled = Gtk.ScrolledWindow()
     scrolled.set_hexpand(True)
     scrolled.set_vexpand(True)
@@ -823,7 +823,7 @@ class MainWindow(Gtk.Window):
     self.list.connect('row-activated', self.edit_actions)
 
     self.connect('delete-event', Gtk.main_quit)
-    
+
     self.bluetooth_window = None
 
   def orchestrate(self, *args):
@@ -836,24 +836,24 @@ class MainWindow(Gtk.Window):
           def make_maestro(a, d):
             maestro = Maestro(a, d + 1)
             return lambda: maestro.next()
-        
+
           GLib.timeout_add_seconds(start_time,
                         make_maestro(actions, dancer))
 
       start_time += 8
-      
+
 
   def get_actions(self, column, cell, model, iter, data):
     column = column.dancer + 2
     cell.set_property('text',
                   self.store.get_value(iter, column).as_string_for_list_view())
-  
+
   def add_tempo(self, *args):
     tempos = len(self.store)
-    
+
     first_tempo = tempos * 8
     second_tempo = first_tempo + 8
-    
+
     self.store.append([
       tempos + 1,
       '%ds - %ds' % (first_tempo, second_tempo),
@@ -878,7 +878,7 @@ class MainWindow(Gtk.Window):
       actions.actions = [action[0] for action in dialog.store]
 
     dialog.destroy()
-  
+
   def open(self, *args):
     dialog = Gtk.FileChooserDialog("Abrir", self,
         Gtk.FileChooserAction.OPEN,
@@ -890,7 +890,7 @@ class MainWindow(Gtk.Window):
       f = open(dialog.get_filename(), 'rb')
       pickled = f.read()
       f.close()
-      
+
       self.store.clear()
       for tempo in pickle.loads(pickled):
         tempos = len(self.store)
@@ -905,10 +905,10 @@ class MainWindow(Gtk.Window):
           Actions.deserialize(tempo[2]),
           Actions.deserialize(tempo[3]),
           Actions.deserialize(tempo[4])
-        ])      
-      
+        ])
+
     dialog.destroy()
-  
+
   def save(self, *args):
     dialog = Gtk.FileChooserDialog("Salvar", self,
         Gtk.FileChooserAction.SAVE,
@@ -920,7 +920,7 @@ class MainWindow(Gtk.Window):
       tempos = []
       for row in self.store:
         tempos.append([r.serialize() for r in row[2:]])
-      
+
       f = open(dialog.get_filename(), 'wb')
       f.write(pickle.dumps(tempos))
       f.close()
