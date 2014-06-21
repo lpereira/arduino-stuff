@@ -357,6 +357,7 @@ class BluetoothDevice:
       BluetoothDevice.WINDOW.update()
 
 class WaitAction(GObject.GObject):
+  name = 'Espera'
   attrs = (('time', 'Tempo (s)'),)
 
   def __init__(self, time):
@@ -373,6 +374,7 @@ class WaitAction(GObject.GObject):
     pass
 
 class TurnOnAction(GObject.GObject):
+  name = 'Liga'
   attrs = (('fio', 'Fio (0 ou 1; 2 liga ambos)'),)
 
   def __init__(self, fio):
@@ -391,6 +393,7 @@ class TurnOnAction(GObject.GObject):
     dancarino.digital_write(self.fio, 1)
 
 class TurnOffAction(GObject.GObject):
+  name = 'Desliga'
   attrs = (('fio', 'Fio (0 ou 1; 2 desliga ambos)'),)
 
   def __init__(self, fio):
@@ -409,6 +412,7 @@ class TurnOffAction(GObject.GObject):
     dancarino.digital_write(self.fio, 0)
 
 class StrobeAction(GObject.GObject):
+  name = 'Strobe'
   attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'),
     ('intervalo', 'Intervalo entre piscada (ms)'),
     ('piscadas', 'Piscadas'))
@@ -446,6 +450,7 @@ class StrobeAction(GObject.GObject):
     dancarino.strobe(self.fio, self.intervalo, self.piscadas)
 
 class FadeInAction(GObject.GObject):
+  name = 'Fade in'
   attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'), ('duration', 'Duração (s)'))
 
   def __init__(self, fio, duration):
@@ -465,6 +470,7 @@ class FadeInAction(GObject.GObject):
     dancarino.fade_in(self.fio, self.duration)
 
 class FadeOutAction(GObject.GObject):
+  name = 'Fade out'
   attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'), ('duration', 'Duração (s)'))
 
   def __init__(self, fio, duration):
@@ -516,13 +522,13 @@ class Actions(GObject.GObject):
 
 
 class ActionConstructDialog(Gtk.Dialog):
-  def __init__(self, parent, attrs, values={}):
+  def __init__(self, parent, action, attrs, values={}):
     if not values:
-      Gtk.Dialog.__init__(self, 'Parâmetros', parent, 0,
+      Gtk.Dialog.__init__(self, 'Parâmetros: %s' % action.name, parent, 0,
         (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
         Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
     else:
-      Gtk.Dialog.__init__(self, 'Editar Parâmetros', parent, 0,
+      Gtk.Dialog.__init__(self, 'Editar Parâmetros: %s' % action.name, parent, 0,
         (Gtk.STOCK_DELETE, Gtk.ResponseType.REJECT,
         Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
         Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
@@ -617,7 +623,7 @@ class ActionsEditor(Gtk.Dialog):
     for attr, value in zip(action.attrs, serialized['attrs']):
       values[attr[0]] = str(value)
 
-    dialog = ActionConstructDialog(self, action.attrs, values)
+    dialog = ActionConstructDialog(self, action, action.attrs, values)
     response = dialog.run()
     if response == Gtk.ResponseType.OK:
       values = [dialog.values[name] for name, _ in action.attrs]
@@ -634,7 +640,7 @@ class ActionsEditor(Gtk.Dialog):
     if not attrs:
       action = action_type()
     else:
-      dialog = ActionConstructDialog(self, attrs)
+      dialog = ActionConstructDialog(self, action_type, attrs)
       response = dialog.run()
       if response == Gtk.ResponseType.OK:
         values = [dialog.values[name] for name, _ in attrs]
