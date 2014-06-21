@@ -928,7 +928,7 @@ class MainWindow(Gtk.Window):
     except:
       return
 
-    dialog = ActionsEditor(self, tempo, column.dancer + 2, actions)
+    dialog = ActionsEditor(self, tempo, column.dancer + 1, actions)
     response = dialog.run()
     if response == Gtk.ResponseType.OK:
       actions.actions = [action[0] for action in dialog.store]
