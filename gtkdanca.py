@@ -139,16 +139,10 @@ class Dancarino:
         self.__write(bytes('L'))
 
     def __calculate_fade_duration(self, duration_in_s):
-        assert(0 <= duration_in_s <= 8.0)
+        assert(0 <= duration_in_s <= 25.5)
 
         duration_in_ms = duration_in_s * 1000.
-        step_in_ms = duration_in_ms / 100.
-
-        # 0.30980392 is the angular coefficient for the line that goes from
-        # (0, 1) to (255, 80).  80ms is the time spent in each step to
-        # produce a 8000ms fade effect.  a param of 255 will fade for 8s, a
-        # param of 127 will fade for roughly 4s, and so on.
-        param = int((step_in_ms - 1.) / 0.30980392)
+        param = int(duration_in_ms / 100.)
         if param > 255: return 255
         if param < 1: return 1
         return param
