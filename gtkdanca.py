@@ -576,8 +576,6 @@ class ActionsEditor(Gtk.Dialog):
     self.props.default_height=500
 
     hb = Gtk.HeaderBar()
-    hb.props.title = self.props.title
-    self.set_titlebar(hb)
 
     def add_action_button(label, action_type):
       button = Gtk.Button(label)
@@ -604,7 +602,11 @@ class ActionsEditor(Gtk.Dialog):
     scrolled.set_hexpand(True)
     scrolled.set_vexpand(True)
 
-    self.get_content_area().add(scrolled)
+    box = Gtk.VBox()
+    box.pack_start(hb, expand=False, fill=True, padding=0)
+    box.pack_start(scrolled, expand=True, fill=True, padding=0)
+
+    self.get_content_area().add(box)
     scrolled.add(self.list)
 
     self.list.connect('row-activated', self.edit_action)
