@@ -811,7 +811,7 @@ class BluetoothWindow(Gtk.Window):
 
 class MainWindow(Gtk.Window):
   def __init__(self):
-    Gtk.Window.__init__(self, title='Controle de Iluminação Bluetooth')
+    Gtk.Window.__init__(self, title='Painel de Controle Lucem')
     self.props.default_width=600
     self.props.default_height=700
 
