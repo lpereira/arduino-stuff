@@ -14,6 +14,14 @@ RFCOMM_UUID = '00001101-0000-1000-8000-00805f9b34fb'
 AGENT_INTERFACE = 'org.bluez.Agent1'
 PROFILE_INTERFACE = 'org.bluez.Profile1'
 
+def known_address(address):
+    if address.startswith('20:13:09'):
+      return True
+    if address.startswith('00:14:02'):
+      return True
+    return False
+
+
 class Profile(dbus.service.Object):
     @dbus.service.method(PROFILE_INTERFACE,
                             in_signature="oha{sv}", out_signature="")
@@ -285,7 +293,7 @@ class BluetoothDevice:
     self.dancarino = None
     self.address = address
     self.device = bluezutils.find_device(address)
-    if address.startswith('20:13:09'):
+    if known_address(address):
       self.__pair()
 
   def __pair(self):
@@ -323,7 +331,7 @@ class BluetoothDevice:
     BluetoothDevice.WINDOW.update()
 
   def connect(self):
-    if self.connecting or not self.address.startswith('20:13:09'):
+    if self.connecting or not known_address(self.address):
       return
 
     dev_path = self.device.object_path
