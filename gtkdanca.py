@@ -552,7 +552,8 @@ class ActionConstructDialog(Gtk.Dialog):
       entry.connect('changed', self.changed_entry)
       entry.set_text(values.get(name, '0'))
       if first:
-        entry.grab_focus()
+        first_entry = entry
+        GLib.idle_add(lambda *a: first_entry.grab_focus())
         first = False
 
       hbox.pack_start(label, True, True, 0)
@@ -707,7 +708,7 @@ class RenameBluetoothDevice(Gtk.Dialog):
 
     self.entry = entry = Gtk.Entry()
     entry.set_text(number)
-    entry.grab_focus()
+    GLib.idle_add(lambda *a: entry.grab_focus())
 
     hbox.pack_start(label, True, True, 0)
     hbox.pack_start(entry, False, True, 0)
