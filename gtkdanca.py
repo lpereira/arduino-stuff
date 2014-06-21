@@ -206,7 +206,10 @@ class BluetoothDevice:
   def unpair(address):
     print('Unpairing device %s' % address)
     device = bluezutils.find_device(address)
-    BluetoothDevice.ADAPTER.RemoveDevice(device.object_path)
+    try:
+      BluetoothDevice.ADAPTER.RemoveDevice(device.object_path)
+    except:
+      pass
 
   @staticmethod
   def start_discovery(window):
