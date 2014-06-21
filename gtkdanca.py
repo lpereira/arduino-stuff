@@ -592,6 +592,7 @@ class ActionsEditor(Gtk.Dialog):
     self.store = Gtk.ListStore(GObject.GObject)
     self.list = Gtk.TreeView(self.store)
     self.list.set_reorderable(True)
+    self.list.set_rules_hint(True)
 
     renderer = Gtk.CellRendererText()
     column = Gtk.TreeViewColumn('Ação', renderer)
@@ -733,6 +734,7 @@ class BluetoothWindow(Gtk.Window):
 
     self.store = Gtk.ListStore(str, str, str, str)
     self.list = Gtk.TreeView(self.store)
+    self.list.set_rules_hint(True)
 
     renderer = Gtk.CellRendererText()
     column = Gtk.TreeViewColumn('Endereço', renderer, text=0)
@@ -852,7 +854,7 @@ class MainWindow(Gtk.Window):
       Actions.__gtype__, Actions.__gtype__, Actions.__gtype__,
       Actions.__gtype__, Actions.__gtype__)
     self.list = Gtk.TreeView(self.store)
-    self.list.props.rules_hint = True
+    self.list.set_rules_hint(True)
 
     renderer = Gtk.CellRendererText()
     column = Gtk.TreeViewColumn('Tempo', renderer, text=0)
