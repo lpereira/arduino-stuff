@@ -428,12 +428,12 @@ class StrobeAction(GObject.GObject):
 
   def as_string_for_list_view(self):
     if self.fio == 2:
-      return 'Strobe ambos (%sx, %ss entre piscada)' % (
+      return 'Strobe ambos (%sx, %sms entre piscada)' % (
         self.piscadas,
         self.intervalo
       )
 
-    return 'Strobe fio %d (%sx, %ss entre piscada)' % (
+    return 'Strobe fio %d (%sx, %sms entre piscada)' % (
       self.fio,
       self.piscadas,
       self.intervalo
