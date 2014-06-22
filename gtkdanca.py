@@ -814,6 +814,119 @@ class BluetoothWindow(Gtk.Window):
       ])
 
 
+class MaestroDialog(Gtk.Dialog):
+  def __init__(self, parent, actions):
+    Gtk.Dialog.__init__(self, 'Maestro', parent)
+    self.props.default_width = 500
+
+    self.auto_advance = True
+    self.start_time = 0
+    self.actions = actions
+    self.current_action = 0
+
+    hb = Gtk.HeaderBar()
+    hb.props.title = self.props.title
+    hb.props.show_close_button = False
+    self.set_titlebar(hb)
+
+    self.advance_button = button = Gtk.Button('Avançar')
+    button.get_style_context().add_class('suggested-action')
+    button.connect('clicked', self.advance)
+    hb.pack_end(button)
+
+    self.autoadv = autoadv = Gtk.CheckButton('Auto avançar')
+    autoadv.set_active(self.auto_advance)
+    autoadv.connect('toggled', self.toggle_auto_advance)
+    hb.pack_start(autoadv)
+
+    box = Gtk.HBox()
+    self.get_content_area().add(box)
+
+    vbox = Gtk.VBox()
+    vbox.pack_start(Gtk.Label('Tempo:'), True, False, 0)
+    self.tempo_label = tempo_label = Gtk.Label('')
+    tempo_label.props.use_markup = True
+    vbox.pack_start(tempo_label, True, True, 0)
+    box.pack_start(vbox, True, True, 0)
+
+    vbox = Gtk.VBox()
+    vbox.pack_start(Gtk.Label('Próximo tempo em:'), True, False, 0)
+    self.prox_tempo_label = prox_tempo_label = Gtk.Label('<span size="xx-large">0s</span>')
+    prox_tempo_label.props.use_markup = True
+    vbox.pack_start(prox_tempo_label, True, True, 0)
+    box.pack_start(vbox, True, True, 0)
+
+    self.last_update_src = None
+    self._update_tempo_label()
+
+  def _update_tempo_label(self):
+    if self.current_action == 0:
+      self.tempo_label.props.label = '<span size="xx-large">-- / %d</span>' % (
+        len(self.actions)
+      )
+    else:
+      self.tempo_label.props.label = '<span size="xx-large">%d / %d</span>' % (
+        self.current_action, len(self.actions)
+      )
+
+  def _update_next_tempo_label(self):
+    if self.next_tempo_in_secs <= 0:
+      self.prox_tempo_label.props.label = '<span size="xx-large">8s</span>'
+      if self.auto_advance:
+        GLib.idle_add(self._advance_one_step)
+      return False
+
+    self.next_tempo_in_secs -= 0.100
+    self.prox_tempo_label.props.label = '<span size="xx-large">%.1fs</span>' % (
+      self.next_tempo_in_secs
+    )
+
+    return True
+
+  def _advance_one_step(self):
+    if self.last_update_src is not None:
+      GLib.source_remove(self.last_update_src)
+
+    try:
+      row = self.actions[self.current_action]
+      self.current_action += 1
+    except:
+      self.current_action = 0
+      self.prox_tempo_label.props.label = '<span size="xx-large">0s</span>'
+      self.advance_button.set_sensitive(True)
+      self.autoadv.set_sensitive(True)
+      return
+    finally:
+      self._update_tempo_label()
+
+    for dancer in range(5):
+      actions = row[dancer + 2].actions
+      if actions:
+        def make_maestro(a, d):
+          maestro = Maestro(a, d + 1)
+          return lambda: maestro.next()
+
+        GLib.idle_add(make_maestro(actions, dancer))
+
+    self.advance_button.set_sensitive(False)
+    self.autoadv.set_sensitive(False)
+    GLib.timeout_add_seconds(8, self._enable_buttons)
+
+    self.next_tempo_in_secs = 8
+    self.last_update_src = GLib.timeout_add(100, self._update_next_tempo_label)
+
+
+  def advance(self, *args):
+    self._advance_one_step()
+
+  def toggle_auto_advance(self, *args):
+    self.auto_advance = self.autoadv.get_active()
+
+  def _enable_buttons(self, *args):
+    if not self.auto_advance:
+      self.advance_button.set_sensitive(True)
+      self.autoadv.set_sensitive(True)
+
 class MainWindow(Gtk.Window):
   def __init__(self):
     Gtk.Window.__init__(self, title='Painel de Controle Lucem')
@@ -888,20 +1001,8 @@ class MainWindow(Gtk.Window):
     self.bluetooth_window = None
 
   def orchestrate(self, *args):
-    start_time = 0
-
-    for row in self.store:
-      for dancer in range(5):
-        actions = row[dancer + 2].actions
-        if actions:
-          def make_maestro(a, d):
-            maestro = Maestro(a, d + 1)
-            return lambda: maestro.next()
-
-          GLib.timeout_add_seconds(start_time,
-                        make_maestro(actions, dancer))
-
-      start_time += 8
+    maestro_window = MaestroDialog(self, self.store)
+    maestro_window.show_all()
 
 
   def get_actions(self, column, cell, model, iter, data):
