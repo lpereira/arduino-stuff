@@ -172,6 +172,9 @@ class Dancarino:
         self.__write('N%c' % chr(number))
 
     def strobe(self, wire, intervalo, piscadas):
+        wire = int(wire)
+        intervalo = int(intervalo)
+        piscadas = int(piscadas)
         assert(wire in (0, 1, 2))
         self.__write('S%c%c%c' % (chr(wire), chr(intervalo), chr(piscadas)))
 
