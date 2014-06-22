@@ -725,10 +725,12 @@ class RenameBluetoothDevice(Gtk.Dialog):
 
 
 class BluetoothWindow(Gtk.Window):
-  def __init__(self):
+  def __init__(self, main_window):
     Gtk.Window.__init__(self, title='Dispositivos Bluetooth')
     self.props.default_width=500
     self.props.default_height=500
+
+    GLib.idle_add(lambda *a: self._move_to_main_window_side(main_window))
 
     hb = Gtk.HeaderBar()
     hb.props.show_close_button = False
@@ -762,6 +764,10 @@ class BluetoothWindow(Gtk.Window):
     scrolled.add(self.list)
 
     self.list.connect('row-activated', self.rename_bluetooth)
+
+  def _move_to_main_window_side(self, main_window):
+    main_window.move(0, 0)
+    self.move(main_window.props.default_width, 0)
 
   def rename_bluetooth(self, list, path, column):
     addr = self.store[path][0]
@@ -1123,7 +1129,7 @@ if __name__ == '__main__':
   window = MainWindow()
   window.show_all()
 
-  btwindow = BluetoothWindow()
+  btwindow = BluetoothWindow(window)
   btwindow.show_all()
   BluetoothDevice.start_discovery(btwindow)
 
