@@ -876,17 +876,17 @@ class MaestroDialog(Gtk.Dialog):
       )
 
   def _update_next_tempo_label(self):
+    self.next_tempo_in_secs -= 0.100
+
     if self.next_tempo_in_secs <= 0:
       self.prox_tempo_label.props.label = '<span size="xx-large">8s</span>'
       if self.auto_advance:
         GLib.idle_add(self._advance_one_step)
       return False
 
-    self.next_tempo_in_secs -= 0.100
     self.prox_tempo_label.props.label = '<span size="xx-large">%.1fs</span>' % (
       self.next_tempo_in_secs
     )
-
     return True
 
   def _advance_one_step(self):
