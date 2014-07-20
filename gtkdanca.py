@@ -487,7 +487,7 @@ class FadeOutAction(GObject.GObject):
     return 'Fade out %s (%ss)' % (self.fio, self.duration)
 
   def serialize(self):
-    return {'action': 'FadeOutAction; 2 ambos', 'attrs': [self.fio, self.duration]}
+    return {'action': 'FadeOutAction', 'attrs': [self.fio, self.duration]}
 
   def perform(self, dancarino):
     dancarino.fade_out(self.fio, self.duration)
