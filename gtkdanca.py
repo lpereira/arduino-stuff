@@ -376,6 +376,25 @@ class WaitAction(GObject.GObject):
   def perform(self, dancarino):
     pass
 
+class LoadAnotherProgram(GObject.GObject):
+  name = 'Carregar outro programa'
+  attrs = (('caminho', 'Caminho', 'file_path'), )
+
+  def __init__(self, caminho):
+    GObject.GObject.__init__(self)
+    self.caminho = caminho
+
+  def as_string_for_list_view(self):
+    return 'Carregar %s' % self.caminho
+
+  def serialize(self):
+    return {'action': 'LoadAnotherProgram', 'attrs': [self.caminho]}
+
+  def perform(self, caminho):
+    global window
+    window.load_file(caminho[len("file://"):])
+
+
 class TurnOnAction(GObject.GObject):
   name = 'Liga'
   attrs = (('fio', 'Fio (0 ou 1; 2 liga ambos)'),)
@@ -546,7 +565,24 @@ class ActionConstructDialog(Gtk.Dialog):
 
     first = True
     self.values = {}
-    for name, text in attrs:
+
+    def attr_iter():
+    	for attr in attrs:
+    		if len(attr) == 3:
+	    		yield attr
+	    	else:
+	    		yield attr[0], attr[1], 'text'
+
+    def entry_factory(entry_type):
+    	if entry_type == 'file_path':
+    		widget = Gtk.FileChooserButton()
+    		widget.connect('file-set', self.file_set)
+    	else:
+    		widget = Gtk.Entry()
+    		widget.connect('changed', self.changed_entry)
+    	return widget
+
+    for name, text, field_type in attr_iter():
       row = Gtk.ListBoxRow()
       hbox = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=50)
       row.add(hbox)
@@ -554,10 +590,8 @@ class ActionConstructDialog(Gtk.Dialog):
 
       self.values[name] = None
 
-      entry = Gtk.Entry()
+      entry = entry_factory(field_type)
       entry.action_param_name = name
-      entry.connect('changed', self.changed_entry)
-      entry.set_text(values.get(name, '0'))
       if first:
         first_entry = entry
         GLib.idle_add(lambda *a: first_entry.grab_focus())
@@ -573,13 +607,17 @@ class ActionConstructDialog(Gtk.Dialog):
   def changed_entry(self, entry):
     self.values[entry.action_param_name] = entry.get_text()
 
+  def file_set(self, entry):
+    self.values[entry.action_param_name] = ''.join(entry.get_uris())
+
 
 class ActionsEditor(Gtk.Dialog):
   def __init__(self, parent, tempo, dancer, actions):
     Gtk.Dialog.__init__(self,
       'Tempo %d, dançarino %d' % (tempo, dancer), parent, 0,
-      (Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
-      Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
+        (Gtk.STOCK_DELETE, Gtk.ResponseType.REJECT,
+        Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+        Gtk.STOCK_SAVE, Gtk.ResponseType.OK))
     self.props.default_height=500
 
     hb = Gtk.HeaderBar()
@@ -595,6 +633,7 @@ class ActionsEditor(Gtk.Dialog):
     add_action_button('Fade in', FadeInAction)
     add_action_button('Fade out', FadeOutAction)
     add_action_button('Strobe', StrobeAction)
+    add_action_button('Carrega', LoadAnotherProgram)
 
     self.store = Gtk.ListStore(GObject.GObject)
     self.list = Gtk.TreeView(self.store)
@@ -654,7 +693,7 @@ class ActionsEditor(Gtk.Dialog):
       dialog = ActionConstructDialog(self, action_type, attrs)
       response = dialog.run()
       if response == Gtk.ResponseType.OK:
-        values = [dialog.values[name] for name, _ in attrs]
+        values = [dialog.values[attr[0]] for attr in attrs]
         action = action_type(*values)
 
       dialog.destroy()
@@ -1048,6 +1087,12 @@ class MainWindow(Gtk.Window):
     response = dialog.run()
     if response == Gtk.ResponseType.OK:
       actions.actions = [action[0] for action in dialog.store]
+    elif response == Gtk.ResponseType.REJECT:
+      self.store.remove(self.store.get_iter(path))
+
+      for tempo, line in enumerate(self.store):
+        line[0] = tempo + 1
+        line[1] = '%ds - %ds' % (tempo * 8, tempo * 8 + 8)
 
     dialog.destroy()
 
@@ -1059,25 +1104,7 @@ class MainWindow(Gtk.Window):
 
     response = dialog.run()
     if response == Gtk.ResponseType.OK:
-      f = open(dialog.get_filename(), 'rb')
-      pickled = f.read()
-      f.close()
-
-      self.store.clear()
-      for tempo in pickle.loads(pickled):
-        tempos = len(self.store)
-        first_tempo = tempos * 8
-        second_tempo = first_tempo + 8
-
-        self.store.append([
-          tempos + 1,
-          '%ds - %ds' % (first_tempo, second_tempo),
-          Actions.deserialize(tempo[0]),
-          Actions.deserialize(tempo[1]),
-          Actions.deserialize(tempo[2]),
-          Actions.deserialize(tempo[3]),
-          Actions.deserialize(tempo[4])
-        ])
+      self.load_file(dialog.get_filename())
 
     dialog.destroy()
 
@@ -1098,6 +1125,27 @@ class MainWindow(Gtk.Window):
       f.close()
 
     dialog.destroy()
+
+  def load_file(self, path):
+      f = open(path, 'rb')
+      pickled = f.read()
+      f.close()
+
+      self.store.clear()
+      for tempo in pickle.loads(pickled):
+        tempos = len(self.store)
+        first_tempo = tempos * 8
+        second_tempo = first_tempo + 8
+
+        self.store.append([
+          tempos + 1,
+          '%ds - %ds' % (first_tempo, second_tempo),
+          Actions.deserialize(tempo[0]),
+          Actions.deserialize(tempo[1]),
+          Actions.deserialize(tempo[2]),
+          Actions.deserialize(tempo[3]),
+          Actions.deserialize(tempo[4])
+        ])
 
 
 if __name__ == '__main__':
@@ -1129,6 +1177,7 @@ if __name__ == '__main__':
   GObject.type_register(FadeInAction)
   GObject.type_register(FadeOutAction)
   GObject.type_register(StrobeAction)
+  GObject.type_register(LoadAnotherProgram)
 
   window = MainWindow()
   window.show_all()
