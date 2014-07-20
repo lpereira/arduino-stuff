@@ -395,6 +395,7 @@ class TurnOnAction(GObject.GObject):
   def perform(self, dancarino):
     dancarino.digital_write(self.fio, 1)
 
+
 class TurnOffAction(GObject.GObject):
   name = 'Desliga'
   attrs = (('fio', 'Fio (0 ou 1; 2 desliga ambos)'),)
@@ -413,6 +414,7 @@ class TurnOffAction(GObject.GObject):
 
   def perform(self, dancarino):
     dancarino.digital_write(self.fio, 0)
+
 
 class StrobeAction(GObject.GObject):
   name = 'Strobe'
@@ -452,6 +454,7 @@ class StrobeAction(GObject.GObject):
   def perform(self, dancarino):
     dancarino.strobe(self.fio, self.intervalo, self.piscadas)
 
+
 class FadeInAction(GObject.GObject):
   name = 'Fade in'
   attrs = (('fio', 'Fio (0 ou 1; 2 ambos)'), ('duration', 'Duração (s)'))
@@ -471,6 +474,7 @@ class FadeInAction(GObject.GObject):
 
   def perform(self, dancarino):
     dancarino.fade_in(self.fio, self.duration)
+
 
 class FadeOutAction(GObject.GObject):
   name = 'Fade out'
