@@ -864,14 +864,14 @@ class BluetoothWindow(Gtk.Window):
 
 
 class MaestroDialog(Gtk.Dialog):
-  def __init__(self, parent, actions):
+  def __init__(self, parent, actions, current_action):
     Gtk.Dialog.__init__(self, 'Maestro', parent)
     self.props.default_width = 500
 
     self.auto_advance = True
     self.start_time = 0
     self.actions = actions
-    self.current_action = 0
+    self.current_action = current_action
 
     hb = Gtk.HeaderBar()
     hb.props.title = self.props.title
@@ -1050,9 +1050,12 @@ class MainWindow(Gtk.Window):
     self.bluetooth_window = None
 
   def orchestrate(self, *args):
-    maestro_window = MaestroDialog(self, self.store)
-    maestro_window.show_all()
+    selection = self.list.get_selection()
+    model, iter = selection.get_selected()
+    row = int(model.get_value(iter, 0))
 
+    maestro_window = MaestroDialog(self, self.store, row - 1)
+    maestro_window.show_all()
 
   def get_actions(self, column, cell, model, iter, data):
     column = column.dancer + 2
