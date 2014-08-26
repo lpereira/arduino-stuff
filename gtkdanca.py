@@ -1050,9 +1050,12 @@ class MainWindow(Gtk.Window):
     self.bluetooth_window = None
 
   def orchestrate(self, *args):
-    selection = self.list.get_selection()
-    model, iter = selection.get_selected()
-    row = int(model.get_value(iter, 0))
+    try:
+      selection = self.list.get_selection()
+      model, iter = selection.get_selected()
+      row = int(model.get_value(iter, 0))
+    except:
+      row = 1
 
     maestro_window = MaestroDialog(self, self.store, row - 1)
     maestro_window.show_all()
