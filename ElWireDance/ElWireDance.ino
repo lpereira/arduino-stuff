@@ -251,8 +251,6 @@ void setup()
 
   if (dancer_number == 2) {
     Serial.println("Workaround for dancer 2 fucked up ports");
-    pinMode(5, INPUT);
-    pinMode(6, INPUT);
     elWire1Pin = 9;
     elWire2Pin = 10;
   }
