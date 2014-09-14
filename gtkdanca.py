@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python2
 # -*- coding: utf-8 -*-
 
 from gi.repository import Gtk, Gio, GObject, GLib
@@ -9,6 +9,9 @@ import dbus.service
 import os
 import pickle
 import sys
+
+import pygst; pygst.require('0.10')
+import gst
 
 RFCOMM_UUID = '00001101-0000-1000-8000-00805f9b34fb'
 AGENT_INTERFACE = 'org.bluez.Agent1'
@@ -908,6 +911,21 @@ class MaestroDialog(Gtk.Dialog):
     self.last_update_src = None
     self._update_tempo_label()
 
+    if parent.music:
+      self.music_player = gst.element_factory_make("playbin", "player")
+      self.music_player.set_property("uri", "file://" + parent.music)
+      self.music_player.set_state(gst.STATE_PAUSED)
+
+      # Wait for at most 3s so that gstreamer is ready
+      self.music_player.get_state(timeout=3*gst.SECOND)
+
+      self.music_player.seek_simple(gst.Format(gst.FORMAT_TIME),
+        gst.SEEK_FLAG_FLUSH | gst.SEEK_FLAG_KEY_UNIT,
+        (8 * current_action) * gst.SECOND)
+        
+    else:
+      self.music_player = None
+
   def _update_tempo_label(self):
     if self.current_action == 0:
       self.tempo_label.props.label = '<span size="xx-large">-- / %d</span>' % (
@@ -925,6 +943,8 @@ class MaestroDialog(Gtk.Dialog):
       self.prox_tempo_label.props.label = '<span size="xx-large">8s</span>'
       if self.auto_advance:
         GLib.idle_add(self._advance_one_step)
+      elif self.music_player:
+        self.music_player.set_state(gst.STATE_PAUSED)
       return False
 
     self.prox_tempo_label.props.label = '<span size="xx-large">%.1fs</span>' % (
@@ -933,6 +953,9 @@ class MaestroDialog(Gtk.Dialog):
     return True
 
   def _advance_one_step(self):
+    if self.music_player:
+      self.music_player.set_state(gst.STATE_PLAYING)
+
     if self.last_update_src is not None:
       GLib.source_remove(self.last_update_src)
 
@@ -964,7 +987,6 @@ class MaestroDialog(Gtk.Dialog):
     self.next_tempo_in_secs = 8
     self.last_update_src = GLib.timeout_add(100, self._update_next_tempo_label)
 
-
   def advance(self, *args):
     self._advance_one_step()
 
@@ -986,6 +1008,12 @@ class MainWindow(Gtk.Window):
     hb.props.show_close_button = True
     hb.props.title = self.props.title
     self.set_titlebar(hb)
+
+    self.mp3_button = button = Gtk.FileChooserButton()
+    button.connect('file-set', self.mp3_selected)
+    button.set_title('Musica')
+    hb.pack_end(button)
+    self.music = None
 
     button = Gtk.Button()
     icon = Gio.ThemedIcon(name='player_play')
@@ -1102,6 +1130,15 @@ class MainWindow(Gtk.Window):
 
     dialog.destroy()
 
+  def mp3_selected(self, button):
+    self.update_music(button.get_filename())
+
+  def update_music(self, music):
+    if self.mp3_button.get_filename() != music:
+      self.mp3_button.set_filename(music)
+
+    self.music = music
+
   def open(self, *args):
     dialog = Gtk.FileChooserDialog("Abrir", self,
         Gtk.FileChooserAction.OPEN,
@@ -1127,7 +1164,10 @@ class MainWindow(Gtk.Window):
         tempos.append([r.serialize() for r in row[2:]])
 
       f = open(dialog.get_filename(), 'wb')
-      f.write(pickle.dumps(tempos))
+      f.write(pickle.dumps({
+        'music': self.music,
+        'tempos': tempos
+      }))
       f.close()
 
     dialog.destroy()
@@ -1138,7 +1178,17 @@ class MainWindow(Gtk.Window):
       f.close()
 
       self.store.clear()
-      for tempo in pickle.loads(pickled):
+      content = pickle.loads(pickled)
+      if isinstance(content, dict):
+        music = content['music']
+        tempos = content['tempos']
+      else:
+        music = None
+        tempos = content
+
+      self.update_music(music)
+
+      for tempo in tempos:
         tempos = len(self.store)
         first_tempo = tempos * 8
         second_tempo = first_tempo + 8
