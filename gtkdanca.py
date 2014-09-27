@@ -1,7 +1,7 @@
-#!/usr/bin/python2
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-from gi.repository import Gtk, Gio, GObject, GLib
+from gi.repository import Gtk, Gio, GObject, GLib, Gst
 import bluezutils
 import dbus
 import dbus.mainloop.glib
@@ -10,8 +10,8 @@ import os
 import pickle
 import sys
 
-import pygst; pygst.require('0.10')
-import gst
+GObject.threads_init()
+Gst.init(None)
 
 RFCOMM_UUID = '00001101-0000-1000-8000-00805f9b34fb'
 AGENT_INTERFACE = 'org.bluez.Agent1'
@@ -912,16 +912,16 @@ class MaestroDialog(Gtk.Dialog):
     self._update_tempo_label()
 
     if parent.music:
-      self.music_player = gst.element_factory_make("playbin", "player")
+      self.music_player = Gst.ElementFactory.make("playbin", "player")
       self.music_player.set_property("uri", "file://" + parent.music)
-      self.music_player.set_state(gst.STATE_PAUSED)
+      self.music_player.set_state(Gst.State.PAUSED)
 
       # Wait for at most 3s so that gstreamer is ready
-      self.music_player.get_state(timeout=3*gst.SECOND)
+      self.music_player.get_state(timeout=3 * Gst.SECOND)
 
-      self.music_player.seek_simple(gst.Format(gst.FORMAT_TIME),
-        gst.SEEK_FLAG_FLUSH | gst.SEEK_FLAG_KEY_UNIT,
-        (8 * current_action) * gst.SECOND)
+      self.music_player.seek_simple(Gst.Format(Gst.Format.TIME),
+        Gst.SeekFlags.FLUSH | Gst.SeekFlags.KEY_UNIT,
+        (8 * current_action) * Gst.SECOND)
         
     else:
       self.music_player = None
@@ -944,7 +944,7 @@ class MaestroDialog(Gtk.Dialog):
       if self.auto_advance:
         GLib.idle_add(self._advance_one_step)
       elif self.music_player:
-        self.music_player.set_state(gst.STATE_PAUSED)
+        self.music_player.set_state(Gst.State.PAUSED)
       return False
 
     self.prox_tempo_label.props.label = '<span size="xx-large">%.1fs</span>' % (
@@ -954,7 +954,7 @@ class MaestroDialog(Gtk.Dialog):
 
   def _advance_one_step(self):
     if self.music_player:
-      self.music_player.set_state(gst.STATE_PLAYING)
+      self.music_player.set_state(Gst.State.PLAYING)
 
     if self.last_update_src is not None:
       GLib.source_remove(self.last_update_src)
