@@ -1,0 +1,25 @@
+This is a firmware for a clone for an educational robotic kit that I
+used in my university.  It was made so that we could have more control
+of the robot movement, which wasn't possible with the firmware provided
+with the kit controller board.  The board was also smaller, which was
+useful.
+
+This is also pre-Arduino, but this repository conveniently existed.
+
+As far as I know, this is the latest firmware version.  Original dates
+are as follows:
+
+  total 60
+  -rw-r--r-- 1 leandro leandro  4552 Jul 22  2007 adc.c
+  -rw-r--r-- 1 leandro leandro  3446 Jul 22  2007 adc.h
+  -rw-r--r-- 1 leandro leandro   194 Jul 21  2007 config.h
+  -rw-r--r-- 1 leandro leandro  2069 Jun 27  2007 printf.c
+  -rw-r--r-- 1 leandro leandro   678 Jun 27  2007 printf.h
+  -rw-r--r-- 1 leandro leandro  2723 Jul 24  2007 uart.c
+  -rw-r--r-- 1 leandro leandro   476 Jul 22  2007 uart.h
+  -rw-r--r-- 1 leandro leandro  4515 Aug  7  2007 y.aps
+  -rw-r--r-- 1 leandro leandro   992 Aug  7  2007 y.aws
+  -rw-r--r-- 1 leandro leandro 12495 Jul 24  2007 y.c
+
+The PDF files here are reports written for my university, in Portuguese,
+of this project.
